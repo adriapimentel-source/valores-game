@@ -514,7 +514,10 @@ function BigBtn({ onClick, disabled, children, accent, "aria-label":al }) {
 
 function SLabel({ children, accent }) {
   return (
-    <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:accent||T.txt3,marginBottom:8}}>
+    <div style={{fontSize:"0.76rem",fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",
+      color:accent||T.txt2,marginBottom:10,
+      textShadow:accent?`0 0 12px ${accent}55`:"none",
+    }}>
       {children}
     </div>
   );
@@ -562,7 +565,8 @@ function Chip({ active, accent, onClick, children }) {
     <button onClick={onClick} role="checkbox" aria-checked={active}
       style={{
         padding:"8px 14px", borderRadius:99, fontSize:"0.86rem",
-        fontWeight:active?700:500, minHeight:44, cursor:"pointer", transition:"all 0.15s",
+        whiteSpace:"nowrap", fontWeight:active?700:500, minHeight:44,
+        cursor:"pointer", transition:"all 0.15s",
         border:`2px solid ${active?accent||T.amber:T.bdr}`,
         background:active?`${accent||T.amber}20`:T.bg3,
         color:active?accent||T.amber:T.txt2,
@@ -625,7 +629,7 @@ function WelcomeScreen({ onStart }) {
       <div aria-hidden style={{position:"fixed",top:"-8%",left:"50%",transform:"translateX(-50%)",width:600,height:280,borderRadius:"50%",filter:"blur(80px)",background:"radial-gradient(ellipse,rgba(255,183,3,.10) 0%,transparent 70%)",pointerEvents:"none"}}/>
       <div style={{width:"100%",maxWidth:440,position:"relative",zIndex:1}}>
         <div style={{display:"flex",justifyContent:"center",marginBottom:20,position:"relative"}}>
-          <SchwartzCircle scores={zero()} size={Math.min(220, window.innerWidth * 0.55)}/>
+          <SchwartzCircle scores={zero()} size={Math.min(220, (typeof window!=="undefined"?window.innerWidth:360) * 0.55)}/>
           <div aria-hidden style={{position:"absolute",bottom:0,left:0,right:0,height:80,background:`linear-gradient(transparent,${T.bg0})`}}/>
         </div>
         <div style={{display:"inline-flex",alignItems:"center",gap:8,background:`${T.amber}18`,border:`2px solid ${T.amber}45`,borderRadius:99,padding:"6px 18px",fontSize:"0.72rem",fontWeight:700,color:T.amber,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:18}}>
@@ -702,7 +706,7 @@ function IntroScreen({ onNext }) {
     {em:"🗺️",t:"O Mapa de Schwartz",
      d:"Ao final, você verá um mapa circular com 10 valores distribuídos em 4 eixos. O radar mostra onde seu perfil é mais forte. Quanto mais preenchido o setor, mais esse valor guia você."},
     {em:"🎯",t:"Como funciona",
-     d:"Você vai passar por 4 fases com diferentes tipos de cenários e perguntas. O mais importante é ser com sinceridade — não existe resposta certa. Em caso de dúvida, escolha a primeira opção que veio à cabeça: a primeira reação revela o valor que realmente guia você, sem filtros."},
+     d:"Você vai passar por 4 fases com diferentes tipos de cenários e perguntas. O mais importante é responder com sinceridade — não existe resposta certa. Em caso de dúvida, escolha a primeira opção que veio à cabeça: a primeira reação revela o valor que realmente guia você, sem filtros."},
   ];
   const c=cards[step];
   return (
@@ -735,16 +739,32 @@ function IntroScreen({ onNext }) {
 function PVQScreen({ onNext, scores, onScores }) {
   const PER_PAGE=7;
   const [page,setPage]=useState(0);
-  const [answers,setAnswers]=useState({}); // idx → rating (0-3)
+  const [answers,setAnswers]=useState({});
+  const [highlight,setHighlight]=useState(null); // idx of first unanswered
+  const itemRefs=useRef({});
   const totalPages=Math.ceil(PVQ_21.length/PER_PAGE);
   const pageItems=PVQ_21.slice(page*PER_PAGE,(page+1)*PER_PAGE);
   const allAnswered=pageItems.every((_,i)=>answers[page*PER_PAGE+i]!==undefined);
-  const ACCENT=T.AM; // orange for this phase
+  const ACCENT="#8DC63F"; // FMM green
+
+  // Scroll to top when page changes
+  useEffect(()=>{
+    window.scrollTo({top:0,behavior:"smooth"});
+    setHighlight(null);
+  },[page]);
 
   const handleNext=()=>{
-    if(page<totalPages-1){setPage(page+1);window.scrollTo({top:0,behavior:"smooth"});}
+    // Find first unanswered on this page
+    const firstMissing = pageItems.findIndex((_,i)=>answers[page*PER_PAGE+i]===undefined);
+    if(firstMissing !== -1){
+      const missingIdx = page*PER_PAGE+firstMissing;
+      setHighlight(missingIdx);
+      const el = itemRefs.current[missingIdx];
+      if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+    if(page<totalPages-1){setPage(page+1);}
     else{
-      // Calculate PVQ scores
       PVQ_21.forEach((item,i)=>{
         const rating=answers[i];
         if(rating!==undefined){
@@ -778,7 +798,21 @@ function PVQScreen({ onNext, scores, onScores }) {
           const globalIdx=page*PER_PAGE+localIdx;
           const chosen=answers[globalIdx];
           return (
-            <div key={globalIdx} style={{background:T.bg1,borderTop:`1px solid ${T.bdr}`,borderRight:`1px solid ${T.bdr}`,borderBottom:`1px solid ${T.bdr}`,borderLeft:`4px solid ${chosen!==undefined?ACCENT:T.bdr}`,borderRadius:"0 14px 14px 0",padding:"16px 18px"}}>
+            <div key={globalIdx}
+              ref={el=>itemRefs.current[globalIdx]=el}
+              style={{background:T.bg1,
+                borderTop:`1px solid ${highlight===globalIdx?"#FF6B6B":T.bdr}`,
+                borderRight:`1px solid ${highlight===globalIdx?"#FF6B6B":T.bdr}`,
+                borderBottom:`1px solid ${highlight===globalIdx?"#FF6B6B":T.bdr}`,
+                borderLeft:`4px solid ${chosen!==undefined?ACCENT:highlight===globalIdx?"#FF6B6B":T.bdr}`,
+                borderRadius:"0 14px 14px 0",padding:"16px 18px",
+                outline:highlight===globalIdx?"2px solid #FF6B6B":"none",
+                transition:"all .2s"}}>
+              {highlight===globalIdx && (
+                <div style={{fontSize:"0.76rem",fontWeight:700,color:"#FF6B6B",marginBottom:8}}>
+                  ⚠️ Marque uma opção para continuar
+                </div>
+              )}
               <p style={{fontSize:"0.95rem",color:T.txt2,margin:"0 0 14px",lineHeight:1.8}}>
                 <span style={{fontFamily:"monospace",fontSize:"0.75rem",color:T.txt3,marginRight:8}}>{globalIdx+1}.</span>
                 {item.text}
@@ -787,9 +821,14 @@ function PVQScreen({ onNext, scores, onScores }) {
                 {PVQ_LABELS.map((lbl,ri)=>{
                   const isSel=chosen===ri;
                   return (
-                    <button key={ri} onClick={()=>setAnswers(p=>({...p,[globalIdx]:ri}))}
+                    <button key={ri}
+                      onClick={()=>{setAnswers(p=>({...p,[globalIdx]:ri}));setHighlight(null);}}
                       aria-pressed={isSel}
-                      style={{minHeight:44,borderRadius:10,fontSize:"0.78rem",fontWeight:isSel?700:500,cursor:"pointer",transition:"all .15s",border:`2px solid ${isSel?ACCENT:T.bdr}`,background:isSel?`${ACCENT}25`:T.bg3,color:isSel?ACCENT:T.txt3,lineHeight:1.3,padding:"6px 4px"}}>
+                      style={{minHeight:44,borderRadius:10,fontSize:"0.78rem",fontWeight:isSel?700:500,cursor:"pointer",transition:"all .15s",
+                        border:`2px solid ${isSel?ACCENT:T.bdr}`,
+                        background:isSel?`${ACCENT}30`:T.bg3,
+                        color:isSel?"#fff":T.txt3,
+                        lineHeight:1.3,padding:"6px 4px"}}>
                       {lbl}
                     </button>
                   );
@@ -799,8 +838,8 @@ function PVQScreen({ onNext, scores, onScores }) {
           );
         })}
       </div>
-      <BigBtn onClick={handleNext} disabled={!allAnswered} accent={ACCENT}>
-        {!allAnswered?`Responda todas as perguntas desta página`:page<totalPages-1?`Próxima página (${page+2}/${totalPages}) →`:"Ver Seus Heróis →"}
+      <BigBtn onClick={handleNext} accent={ACCENT}>
+        {page<totalPages-1?`Próxima página (${page+2}/${totalPages}) →`:"Ver Seus Heróis →"}
       </BigBtn>
       <p style={{fontSize:"0.78rem",color:T.txt3,textAlign:"center",marginTop:12}}>
         Instrumento PVQ-21 · ESS (2009) · adaptado ao português
@@ -901,7 +940,10 @@ function Phase2Screen({ onNext, scores, onScores }) {
   };
   const goNext = () => {
     if (chosen) onScores(chosen.v);
-    if (idx < DILEMAS.length - 1) { setIdx(idx + 1); setChosen(null); setShown(false); }
+    if (idx < DILEMAS.length - 1) {
+      setIdx(idx + 1); setChosen(null); setShown(false);
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
     else onNext();
   };
 
@@ -946,10 +988,11 @@ function Phase2Screen({ onNext, scores, onScores }) {
                   background: isSel ? `${ACCENT}22` : T.bg2,
                   border: `2px solid ${isSel ? ACCENT : T.bdrHi}`,
                   color: isSel ? T.txt : T.txt2,
+                  display:"flex", alignItems:"flex-start", gap:10,
                 }}>
-                <span aria-hidden style={{fontFamily:"monospace",fontSize:"0.82rem",fontWeight:700,color:isSel?ACCENT:T.txt3,marginRight:10}}>{opt.letra}.</span>
-                {opt.t}
-                {isSel && <span aria-hidden style={{float:"right",color:ACCENT,fontSize:"1rem"}}>✓</span>}
+                <span aria-hidden style={{fontFamily:"monospace",fontSize:"0.82rem",fontWeight:700,color:isSel?ACCENT:T.txt3,flexShrink:0}}>{opt.letra}.</span>
+                <span style={{flex:1}}>{opt.t}</span>
+                {isSel && <span aria-hidden style={{color:ACCENT,fontSize:"1rem",flexShrink:0}}>✓</span>}
               </button>
             );
           })}
@@ -1037,7 +1080,7 @@ function MapaTab({ scores }) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
-        <SchwartzCircleLabeled scores={scores} size={Math.min(280, window.innerWidth * 0.75)}/>
+        <SchwartzCircleLabeled scores={scores} size={Math.min(280, (typeof window!=="undefined"?window.innerWidth:360) * 0.75)}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         {Object.entries(QUADRANTS).map(([axKey,quad])=>{
@@ -1072,7 +1115,7 @@ function MapaTab({ scores }) {
 
 // TAB 2: Top 3 — with keywords + gradient strength
 function Top3Tab({ scores }) {
-  const top=useMemo(()=>top3(scores),[scores]);
+  const top=useMemo(()=>{const t=top3(scores);return t.length>=3?t:VKEYS.slice(0,3);},[scores]);
   const n=useMemo(()=>normS(scores),[scores]);
   const STRENGTHS=[{label:"Mais forte",borderW:6,iconSize:52,badgeOp:1.0},{label:"Segundo",borderW:4,iconSize:44,badgeOp:0.78},{label:"Terceiro",borderW:3,iconSize:38,badgeOp:0.58}];
 
@@ -1131,18 +1174,24 @@ function Top3Tab({ scores }) {
 
 // TAB 3: Reflexão — invitation framing + fixed mission conjugation
 function ReflexaoTab({ scores, reg }) {
-  const top=useMemo(()=>top3(scores),[scores]);
-  const m=VALOR_MISSION[top[0]];
-  const v1=VALORES[top[0]],v2=VALORES[top[1]],v3=VALORES[top[2]];
+  const top=useMemo(()=>{
+    const t=top3(scores);
+    // fallback to first 3 VKEYS if scores are all zero
+    return t.length>=3?t:VKEYS.slice(0,3);
+  },[scores]);
+  const m=VALOR_MISSION[top[0]]||VALOR_MISSION["autodeterminacao"];
+  const v1=VALORES[top[0]]||VALORES["autodeterminacao"];
+  const v2=VALORES[top[1]]||VALORES["benevolencia"];
+  const v3=VALORES[top[2]]||VALORES["universalismo"];
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       <Card accent={T.AT}>
         <SLabel accent={T.AT}>📖 Sobre valores autênticos</SLabel>
-        <p style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.85,margin:"0 0 10px"}}>
+        <p style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.85,margin:"0 0 10px",textAlign:"justify"}}>
           Valores não são o que você <em>diz</em> que acredita — são o que guia suas ações quando ninguém está olhando, quando você está sob pressão, quando tem que escolher entre o fácil e o certo.
         </p>
-        <p style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.85,margin:0}}>
+        <p style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.85,margin:0,textAlign:"justify"}}>
           Não existe perfil "melhor". Existe o <strong style={{color:T.txt}}>seu</strong>, autêntico.
         </p>
       </Card>
@@ -1150,7 +1199,7 @@ function ReflexaoTab({ scores, reg }) {
       {/* Invitation to reflect — framing text before questions */}
       <Card accent="#FFC850">
         <SLabel accent="#FFC850">⚡ Convite à Reflexão</SLabel>
-        <p style={{fontSize:"0.92rem",color:T.txt2,lineHeight:1.85,margin:"0 0 18px"}}>
+        <p style={{fontSize:"0.92rem",color:T.txt2,lineHeight:1.85,margin:"0 0 18px",textAlign:"justify"}}>
           As perguntas abaixo são um <strong style={{color:T.txt}}>convite</strong>, não uma avaliação. Reserve um momento para pensar com honestidade sobre você. Não há respostas certas — há apenas as suas.
         </p>
         <ol style={{margin:0,paddingLeft:22,display:"flex",flexDirection:"column",gap:16}}>
@@ -1159,7 +1208,7 @@ function ReflexaoTab({ scores, reg }) {
             `Você já agiu por desejo momentâneo e se arrependeu? O que o valor ${v1.nome} teria sugerido?`,
             `Como ${v1.nome.toLowerCase()} aparece nas suas relações com amigos e família?`,
           ].map((q,i)=>(
-            <li key={i} style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.8,paddingLeft:4}}>{q}</li>
+            <li key={i} style={{fontSize:"0.95rem",color:T.txt2,lineHeight:1.8,paddingLeft:4,textAlign:"justify"}}>{q}</li>
           ))}
         </ol>
       </Card>
@@ -1167,7 +1216,7 @@ function ReflexaoTab({ scores, reg }) {
       {/* Mission statement — grammatically correct, inclusive language */}
       <div style={{background:`linear-gradient(135deg,${T.amber}14,${T.AT}12)`,border:`2px solid ${T.amber}42`,borderRadius:16,padding:"20px 22px"}}>
         <SLabel accent={T.amber}>🎯 Minha missão de carreira (esboço)</SLabel>
-        <p style={{fontSize:"1rem",color:T.txt2,lineHeight:1.9,fontStyle:"italic",margin:"0 0 6px"}}>
+        <p style={{fontSize:"1rem",color:T.txt2,lineHeight:1.9,fontStyle:"italic",margin:"0 0 6px",textAlign:"justify"}}>
           "Serei mais feliz quando puder ser uma pessoa{" "}
           <strong style={{color:T[top[0]],fontStyle:"normal"}}>{m.adj}</strong>,
           {" "}em <strong style={{color:T[top[1]],fontStyle:"normal"}}>{m.ctx}</strong>,
@@ -1187,20 +1236,203 @@ function ReflexaoTab({ scores, reg }) {
   );
 }
 
+
+// ════════════════════════════════════════════════════════════════
+// TAB 4: SAIBA MAIS — descrição científica dos 4 eixos e 10 valores
+// Baseado em: Schwartz (2005), Tamayo & Porto (2009), PVQ-21 ESS
+// ════════════════════════════════════════════════════════════════
+const SAIBA_DATA = [
+  {
+    axKey:"AT", titulo:"Autotranscendência",
+    desc:"Engloba valores que priorizam o bem-estar coletivo em detrimento dos interesses pessoais. Pessoas com alto índice neste eixo tendem a agir por empatia, solidariedade e senso de justiça global. É o oposto da Autopromoção.",
+    ref:"Schwartz (1992) define este polo como a tendência de transcender os interesses do ego para promover o bem-estar dos outros e da natureza.",
+    valores:[
+      { key:"universalismo", titulo:"Universalismo",
+        def:"Compreensão, tolerância e proteção do bem-estar de todas as pessoas e da natureza.",
+        exemplos:"Lutar por igualdade racial, defender o meio ambiente, valorizar a diversidade cultural.",
+        oposto:"Poder — enquanto o universalismo busca o bem de todos, o poder busca domínio sobre outros.",
+        ref:"Derivado das necessidades de sobrevivência do grupo e da interação com aqueles fora do círculo próximo (Schwartz, 1992)." },
+      { key:"benevolencia", titulo:"Benevolência",
+        def:"Preservação e melhoria do bem-estar das pessoas com quem se tem contato frequente.",
+        exemplos:"Cuidar de amigos em dificuldade, ser leal à família, agir com generosidade no cotidiano.",
+        oposto:"Realização — benevolência prioriza o outro; realização prioriza o sucesso pessoal.",
+        ref:"Origina-se da necessidade de afiliação e de manter relações de grupo positivas (Schwartz & Bilisky, 1990)." },
+    ]
+  },
+  {
+    axKey:"AM", titulo:"Abertura à Mudança",
+    desc:"Reúne valores ligados à independência intelectual e emocional, à busca de novidades e ao prazer. Pessoas neste polo tendem a questionar o estabelecido, explorar o novo e seguir seus próprios caminhos. É o oposto da Conservação.",
+    ref:"Schwartz (1992) descreve este polo como a motivação para seguir o próprio pensamento e impulso, abraçando a mudança e a novidade.",
+    valores:[
+      { key:"autodeterminacao", titulo:"Autodeterminação",
+        def:"Independência no pensamento e na ação — escolher, criar e explorar de forma autônoma.",
+        exemplos:"Tomar decisões próprias, criar projetos originais, questionar normas por princípio.",
+        oposto:"Conformidade e Tradição — que valorizam seguir regras e costumes estabelecidos.",
+        ref:"Deriva das necessidades de controle, autonomia e interação independente com o ambiente (Deci & Ryan, apud Schwartz, 1992)." },
+      { key:"estimulacao", titulo:"Estimulação",
+        def:"Busca de excitação, novidade e desafio como fonte de motivação.",
+        exemplos:"Experimentar esportes radicais, viajar para lugares desconhecidos, buscar novas experiências.",
+        oposto:"Segurança e Conformidade — que valorizam estabilidade e previsibilidade.",
+        ref:"Relacionada à necessidade biológica de ativação e estimulação variada para manter nível ideal de funcionamento (Schwartz, 1992)." },
+      { key:"hedonismo", titulo:"Hedonismo",
+        def:"Busca de prazer e gratificação sensorial para si mesmo.",
+        exemplos:"Apreciar momentos de lazer, valorizar experiências agradáveis, incluir diversão na rotina.",
+        oposto:"Conformidade — que restringe impulsos em prol das normas coletivas.",
+        ref:"Derivado das necessidades orgânicas de prazer, presente em todos os organismos (Schwartz & Bilisky, 1990)." },
+    ]
+  },
+  {
+    axKey:"C", titulo:"Conservação",
+    desc:"Engloba valores que enfatizam a ordem, a autocoerção e a resistência à mudança. Pessoas neste polo tendem a valorizar a estabilidade, o respeito às normas e a preservação das estruturas sociais existentes. É o oposto da Abertura à Mudança.",
+    ref:"Schwartz (1992) descreve este polo como a motivação para preservar práticas tradicionais e proteger a estabilidade das estruturas sociais.",
+    valores:[
+      { key:"seguranca", titulo:"Segurança",
+        def:"Busca de segurança, harmonia e estabilidade na sociedade, nos relacionamentos e no self.",
+        exemplos:"Priorizar estabilidade financeira, valorizar ambientes previsíveis, proteger a família.",
+        oposto:"Estimulação — que busca novidade e risco.",
+        ref:"Deriva da necessidade básica de proteção e de pertencimento a grupos estáveis (Schwartz, 1992)." },
+      { key:"conformidade", titulo:"Conformidade",
+        def:"Restrição de ações, inclinações e impulsos que possam perturbar ou prejudicar outros.",
+        exemplos:"Seguir regras escolares, respeitar a vez de falar, obedecer combinados mesmo sem fiscalização.",
+        oposto:"Autodeterminação — que valoriza agir segundo a própria vontade.",
+        ref:"Origina-se da necessidade de inibir tendências que possam minar o funcionamento e a coesão do grupo (Schwartz, 1992)." },
+      { key:"tradicao", titulo:"Tradição",
+        def:"Respeito, comprometimento e aceitação dos costumes e ideias transmitidos pela cultura e religião.",
+        exemplos:"Valorizar festas e rituais familiares, respeitar a sabedoria dos mais velhos, manter práticas culturais.",
+        oposto:"Autodeterminação — que valoriza criar e questionar o estabelecido.",
+        ref:"Grupos desenvolvem práticas e símbolos compartilhados; aceitar essas tradições expressa solidariedade e unicidade do grupo (Schwartz, 1992)." },
+    ]
+  },
+  {
+    axKey:"AP", titulo:"Autopromoção",
+    desc:"Reúne valores que priorizam o sucesso pessoal, a busca de status e o controle sobre pessoas e recursos. Pessoas neste polo tendem a ser orientadas por metas individuais e pelo reconhecimento externo. É o oposto da Autotranscendência.",
+    ref:"Schwartz (1992) descreve este polo como a motivação para promover os próprios interesses, mesmo à custa dos outros.",
+    valores:[
+      { key:"realizacao", titulo:"Realização",
+        def:"Busca de sucesso pessoal por meio da demonstração de competência segundo padrões sociais.",
+        exemplos:"Buscar excelência acadêmica, conquistar metas profissionais, ser reconhecido pelo mérito.",
+        oposto:"Benevolência — que prioriza o bem-estar do outro antes do sucesso próprio.",
+        ref:"Deriva da necessidade de demonstrar competência para obter aprovação social (Schwartz & Bilisky, 1990)." },
+      { key:"poder", titulo:"Poder",
+        def:"Busca de status social, prestígio e controle sobre pessoas e recursos.",
+        exemplos:"Assumir posições de liderança, buscar influência, construir uma reputação de autoridade.",
+        oposto:"Universalismo — que busca igualdade entre as pessoas.",
+        ref:"Enraizado nas necessidades de dominância e controle presentes em todos os grupos sociais hierárquicos (Schwartz, 1992)." },
+    ]
+  },
+];
+
+function SaibaMaisTab() {
+  const [open, setOpen] = useState({});
+  const toggle = key => setOpen(p => ({...p, [key]: !p[key]}));
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {/* Header */}
+      <div style={{background:T.bg2,borderRadius:14,padding:"16px 18px",border:`1px solid ${T.bdrHi}`}}>
+        <SLabel accent={T.amber}>📚 Base Científica</SLabel>
+        <p style={{fontSize:"0.92rem",color:T.txt2,lineHeight:1.85,margin:0,textAlign:"justify"}}>
+          Os 10 valores abaixo formam a <strong style={{color:T.txt}}>Teoria dos Valores Básicos de Schwartz</strong>, validada em mais de 80 países. Eles se organizam em 4 grandes eixos opostos em pares. Toque em cada valor para entender o que ele significa na prática.
+        </p>
+      </div>
+
+      {SAIBA_DATA.map(({axKey, titulo, desc, ref, valores}) => {
+        const accent = T[axKey];
+        return (
+          <div key={axKey} style={{borderRadius:16,overflow:"hidden",
+            border:`2px solid ${accent}`,
+            boxShadow:`0 0 0 1px ${accent}22, 0 4px 20px ${accent}14`}}>
+            {/* Axis header — unique bg per quadrant */}
+            <div style={{
+              background: axKey==="AT" ? "rgba(63,203,168,0.13)"
+                        : axKey==="AM" ? "rgba(242,162,42,0.13)"
+                        : axKey==="C"  ? "rgba(58,142,200,0.13)"
+                        :                "rgba(142,122,224,0.13)",
+              padding:"16px 18px",borderBottom:`1px solid ${accent}30`}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:14,height:14,borderRadius:"50%",background:accent,flexShrink:0}}/>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,color:accent,margin:0}}>{titulo}</h3>
+              </div>
+              <p style={{fontSize:"0.88rem",color:T.txt2,lineHeight:1.8,margin:"0 0 8px",textAlign:"justify"}}>{desc}</p>
+              <p style={{fontSize:"0.76rem",color:T.txt3,lineHeight:1.7,margin:0,fontStyle:"italic",textAlign:"justify"}}>"{ref}"</p>
+            </div>
+
+            {/* Values accordion */}
+            <div style={{background: axKey==="AT" ? "#0C3530"
+                                    : axKey==="AM" ? "#2E1F0A"
+                                    : axKey==="C"  ? "#0A1E2E"
+                                    :                "#1A1228"}}>
+              {valores.map(v => {
+                const cor = T[v.key];
+                const isOpen = open[v.key];
+                return (
+                  <div key={v.key} style={{borderBottom:`1px solid ${T.bdr}`}}>
+                    {/* Accordion trigger */}
+                    <button onClick={()=>toggle(v.key)}
+                      aria-expanded={isOpen}
+                      style={{width:"100%",textAlign:"left",padding:"14px 18px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:12,minHeight:54}}>
+                      <span style={{fontSize:"1.1rem"}}>{VALORES[v.key].emoji}</span>
+                      <span style={{flex:1,fontSize:"0.97rem",fontWeight:700,color:cor}}>{v.titulo}</span>
+                      <span style={{color:T.txt3,fontSize:"0.85rem",transition:"transform .2s",display:"inline-block",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+                    </button>
+
+                    {/* Accordion content */}
+                    {isOpen && (
+                      <div style={{padding:"0 18px 18px",display:"flex",flexDirection:"column",gap:12}}>
+                        {/* Definition */}
+                        <div style={{background:T.bg3,borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${cor}`}}>
+                          <div style={{fontSize:"0.7rem",fontWeight:700,color:cor,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>Definição</div>
+                          <p style={{fontSize:"0.9rem",color:T.txt,lineHeight:1.8,margin:0,textAlign:"justify"}}>{v.def}</p>
+                        </div>
+                        {/* Examples */}
+                        <div style={{background:T.bg3,borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${T.amber}`}}>
+                          <div style={{fontSize:"0.7rem",fontWeight:700,color:T.amber,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>✦ Na prática</div>
+                          <p style={{fontSize:"0.9rem",color:T.txt2,lineHeight:1.8,margin:0,textAlign:"justify"}}>{v.exemplos}</p>
+                        </div>
+                        {/* Opposite */}
+                        <div style={{background:T.bg3,borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${T.txt3}`}}>
+                          <div style={{fontSize:"0.7rem",fontWeight:700,color:T.txt3,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>↔ Valor oposto</div>
+                          <p style={{fontSize:"0.9rem",color:T.txt2,lineHeight:1.8,margin:0,textAlign:"justify"}}>{v.oposto}</p>
+                        </div>
+                        {/* Reference */}
+                        <p style={{fontSize:"0.76rem",color:T.txt3,lineHeight:1.7,margin:0,fontStyle:"italic",textAlign:"justify"}}>{v.ref}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      <p style={{textAlign:"center",fontSize:"0.76rem",color:T.txt3,lineHeight:1.8,margin:0}}>
+        Fontes: Schwartz, S.H. (1992). Universals in the content and structure of values.<br/>
+        Tamayo & Porto (2009). Validação do QPV no Brasil. Psic.: Teoria e Pesquisa, 25(3).<br/>
+        PVQ-21 · European Social Survey (2009).
+      </p>
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 // SCREEN: RESULTS
 // ════════════════════════════════════════════════════════════════
 function ResultsScreen({ scores, reg }) {
   const [tab,setTab]=useState("mapa");
-  const [sending,setSending]=useState(false);
   const [sent,setSent]=useState(null); // null | "ok" | "erro"
-  const TABS=[{k:"mapa",l:"Mapa"},{k:"top3",l:"Top 3"},{k:"reflexao",l:"Reflexão"}];
+  const TABS=[{k:"mapa",l:"Mapa"},{k:"top3",l:"Top 3"},{k:"reflexao",l:"Reflexão"},{k:"saibamais",l:"📚 Entenda"}];
 
-  const handleSend=async()=>{
-    setSending(true);
-    const res=await sendToSheets(reg,scores);
-    setSent(res.ok?"ok":"erro");
-    setSending(false);
+  // Envio automático ao chegar na tela — sem precisar clicar
+  useEffect(()=>{
+    if(!SHEETS_WEBHOOK_URL) return;
+    sendToSheets(reg, scores).then(res => setSent(res.ok ? "ok" : "erro"));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleReenviar = async () => {
+    setSent(null);
+    const res = await sendToSheets(reg, scores);
+    setSent(res.ok ? "ok" : "erro");
   };
 
   return (
@@ -1211,49 +1443,61 @@ function ResultsScreen({ scores, reg }) {
         <p style={{fontSize:"0.85rem",color:T.txt3,margin:0}}>Turma {reg.turma} · RA {reg.ra}</p>
       </div>
 
-      {/* Tabs */}
-      <div role="tablist" style={{display:"flex",gap:5,background:T.bg2,borderRadius:14,padding:5,marginBottom:24}}>
-        {TABS.map(({k,l})=>(
-          <button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k)}
-            style={{flex:1,minHeight:48,borderRadius:10,fontSize:"0.9rem",fontWeight:700,cursor:"pointer",transition:"all .18s",border:`2px solid ${tab===k?T.amber:"transparent"}`,background:tab===k?T.amber:"transparent",color:tab===k?T.bg0:T.txt3}}>
-            {l}
-          </button>
-        ))}
+      {/* Status do envio — discreto no topo */}
+      {SHEETS_WEBHOOK_URL && (
+        <div style={{textAlign:"center",marginBottom:16,fontSize:"0.82rem",minHeight:24}}>
+          {sent===null && (
+            <span style={{color:T.txt3}}>📤 Salvando resultado...</span>
+          )}
+          {sent==="ok" && (
+            <span style={{color:T.AT,fontWeight:700}}>✅ Resultado salvo com sucesso!</span>
+          )}
+          {sent==="erro" && (
+            <span>
+              <span style={{color:T.hedonismo,fontWeight:700,marginRight:10}}>⚠️ Erro ao salvar.</span>
+              <button onClick={handleReenviar}
+                style={{background:"none",border:`1px solid ${T.hedonismo}`,borderRadius:6,color:T.hedonismo,padding:"2px 10px",fontSize:"0.8rem",cursor:"pointer",fontWeight:700}}>
+                Tentar novamente
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Tabs — faixa chamativa com cor única por aba */}
+      <div role="tablist"
+        style={{display:"flex",gap:6,padding:"6px",marginBottom:24,
+          background:"linear-gradient(135deg,#071E26 0%,#0C3530 50%,#0A1E2E 100%)",
+          borderRadius:16,border:`2px solid ${T.bdrHi}`,
+          boxShadow:"0 4px 24px rgba(0,0,0,0.5)"}}>
+        {TABS.map(({k,l})=>{
+          const tabAccents={mapa:T.AT,top3:T.amber,reflexao:T.AM,saibamais:"#8DC63F"};
+          const ac=tabAccents[k];
+          const isActive=tab===k;
+          return (
+            <button key={k} role="tab" aria-selected={isActive} onClick={()=>setTab(k)}
+              style={{
+                flex:1, minHeight:52, borderRadius:11,
+                fontSize:"0.82rem", fontWeight:700, cursor:"pointer",
+                lineHeight:1.25, padding:"6px 4px",
+                transition:"all .2s",
+                background: isActive ? ac : "transparent",
+                border: `2px solid ${isActive ? ac : ac+"66"}`,
+                color: isActive ? T.bg0 : ac,
+                boxShadow: isActive ? `0 2px 12px ${ac}55` : "none",
+              }}>
+              {l}
+            </button>
+          );
+        })}
       </div>
 
       <FadeUp id={tab}>
         {tab==="mapa"    && <MapaTab scores={scores}/>}
         {tab==="top3"    && <Top3Tab scores={scores}/>}
-        {tab==="reflexao"&& <ReflexaoTab scores={scores} reg={reg}/>}
+        {tab==="reflexao"  && <ReflexaoTab scores={scores} reg={reg}/>}
+        {tab==="saibamais" && <SaibaMaisTab/>}
       </FadeUp>
-
-      {/* Google Sheets send button */}
-      <div style={{marginTop:32,paddingTop:20,borderTop:`1px solid ${T.bdr}`}}>
-        {SHEETS_WEBHOOK_URL?(
-          <div>
-            {sent==="ok"?(
-              <div style={{textAlign:"center",padding:"14px 20px",borderRadius:12,background:`${T.AT}18`,border:`2px solid ${T.AT}45`}}>
-                <div style={{fontSize:"1.4rem",marginBottom:6}}>✅</div>
-                <p style={{color:T.AT,fontWeight:700,margin:0,fontSize:"0.95rem"}}>Resultado enviado com sucesso!</p>
-                <p style={{color:T.txt3,margin:"4px 0 0",fontSize:"0.82rem"}}>Sua professora já pode visualizar no Google Sheets.</p>
-              </div>
-            ):sent==="erro"?(
-              <div style={{textAlign:"center",padding:"14px 20px",borderRadius:12,background:`${T.hedonismo}18`,border:`2px solid ${T.hedonismo}45`}}>
-                <p style={{color:T.hedonismo,fontWeight:700,margin:"0 0 8px",fontSize:"0.95rem"}}>Erro ao enviar. Tente novamente.</p>
-                <BigBtn onClick={handleSend} accent={T.hedonismo}>Tentar novamente</BigBtn>
-              </div>
-            ):(
-              <BigBtn onClick={handleSend} disabled={sending} accent={T.AT}>
-                {sending?"📤 Enviando...":"📤 Enviar resultado para a professora"}
-              </BigBtn>
-            )}
-          </div>
-        ):(
-          <p style={{textAlign:"center",fontSize:"0.8rem",color:T.txt3,margin:0,padding:"12px 16px",borderRadius:10,background:T.bg2,border:`1px solid ${T.bdr}`}}>
-            🔧 Configure o SHEETS_WEBHOOK_URL no código para habilitar o envio automático.
-          </p>
-        )}
-      </div>
 
       <div style={{height:40}}/>
     </div>
@@ -1277,11 +1521,17 @@ export default function App() {
   const addScores=useCallback(v=>setScores(p=>addS(p,v)),[]);
 
   const fsSizes=["18px","20px","22px"];
+  // Apply font size to <html> so rem units scale everywhere
+  useEffect(()=>{
+    const base = a11y.bigText ? "22px" : fsSizes[a11y.fontSize] || "18px";
+    document.documentElement.style.fontSize = base;
+    return () => { document.documentElement.style.fontSize = ""; };
+  }, [a11y.fontSize, a11y.bigText]);
+
   const rootStyle={
     minHeight:"100vh",
     background:a11y.highContrast?"#000":T.bg0,
     color:a11y.highContrast?"#fff":T.txt,
-    fontSize:a11y.bigText?"22px":fsSizes[a11y.fontSize]||"18px",
     fontFamily:"'Atkinson Hyperlegible','Verdana',sans-serif",
   };
 
@@ -1308,4 +1558,3 @@ export default function App() {
     </div>
   );
 }
-
